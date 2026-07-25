@@ -235,6 +235,30 @@ open -a "Docker Desktop"
 ```
 Then wait for `docker info` to succeed before retrying `docker-compose up`.
 
+**G. A second clone of this repo silently recreates your first clone's containers**
+`docker-compose.yml` pins the project name to a fixed literal
+(`name: chronicle-session13-3`) to solve a *different* problem — every
+session folder in this course being named `chronicle`, which made
+Compose's directory-basename default collide across sessions. That fix
+has a side effect: it's still just one fixed name, so if you (or a
+grader, or a CI runner) `git clone` this repo into a **second** location
+on the same machine and run `docker-compose up` there while your first
+clone's stack is still running, Compose sees the same project name and
+**reuses/recreates your first clone's containers instead of starting an
+independent stack** — no error, no warning, it just quietly swaps out
+what's backing your running services. Confirmed by actually doing this:
+`docker ps` showed only one set of `chronicle-session13-3-*` containers
+after starting the "second" stack.
+
+This only bites you if you deliberately need two independent copies
+running at once. If so, override the project name per clone:
+```bash
+docker-compose -p chronicle-session13-3-clone2 up -d --build
+```
+Any unique `-p` value works — just don't reuse one that's already active
+elsewhere on the machine. For the normal case (one clone, one running
+stack) you don't need to do anything.
+
 ---
 
 ## 5. What Session 13.3 added
