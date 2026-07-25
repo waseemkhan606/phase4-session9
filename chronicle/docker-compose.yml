@@ -1,0 +1,42 @@
+# Explicit project name — without this, Compose defaults to the directory's
+# basename ("chronicle"), which every session folder in this course shares.
+# Two sessions' stacks on the same machine would otherwise collide on
+# container and network names the moment both have been started once.
+name: chronicle-session13-3
+
+services:
+  phoenix:
+    image: arizephoenix/phoenix:latest
+    ports:
+      - "6006:6006"   # Phoenix UI + OTLP/HTTP collector
+      - "4317:4317"   # OTLP/gRPC collector
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:6006/healthz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      # api runs inside the compose network, so it reaches Phoenix by
+      # service name, not localhost — otel_setup.py reads this override.
+      - PHOENIX_COLLECTOR_ENDPOINT=http://phoenix:6006/v1/traces
+    depends_on:
+      phoenix:
+        condition: service_healthy
+
+  ui:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./index.html:/usr/share/nginx/html/index.html:ro
+    depends_on:
+      - api

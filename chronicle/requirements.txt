@@ -1,0 +1,25 @@
+# Chronicle — Session 13.3 Requirements
+# (unchanged from Session 13.2 — monitoring_daemon.py uses only deps already listed below)
+# Install: pip install -r requirements.txt
+
+google-generativeai>=0.8.0
+langchain-google-genai>=2.0.0
+langgraph>=0.2.0
+aiohttp>=3.9.0
+pydantic>=2.0.0
+fastapi>=0.115.0
+uvicorn>=0.30.0
+python-dotenv>=1.0.0
+certifi>=2024.0.0
+
+# OpenTelemetry tracing (Session 13.1)
+opentelemetry-sdk>=1.27.0
+opentelemetry-api>=1.27.0
+opentelemetry-instrumentation-fastapi>=0.48b0
+opentelemetry-instrumentation-httpx>=0.48b0
+
+# Arize Phoenix + OTLP export + LLM-as-Judge (Session 13.2)
+opentelemetry-exporter-otlp-proto-http>=1.27.0
+arize-phoenix>=8.0.0
+arize-phoenix-client>=1.0.0
+pandas>=2.0.0

@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chronicle — Personal AI Analyst</title>
+  <style>
+    /* ── Reset & Base (Session 11.1) ─────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Google Sans', 'Segoe UI', sans-serif;
+      background: #0F172A;
+      color: #F8FAFC;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header (Session 11.1) ────────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 28px;
+      background: #0F172A;
+      border-bottom: 1px solid #1E293B;
+    }
+
+    .logo {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      color: #F8FAFC;
+    }
+
+    .logo span { color: #3B82F6; }
+
+    .session-pill {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 4px 10px;
+      color: #94A3B8;
+    }
+
+    /* ── Progress Bar (Session 11.1) ─────────────────────────── */
+    .session-progress {
+      display: flex;
+      gap: 8px;
+      padding: 10px 28px;
+      background: #0F172A;
+      border-bottom: 1px solid #1E293B;
+      font-size: 11px;
+      color: #475569;
+    }
+
+    .progress-item { display: flex; align-items: center; gap: 4px; }
+    .progress-item.active { color: #3B82F6; }
+    .progress-sep { color: #1E293B; }
+
+    /* ── Split Layout (Session 11.1) ─────────────────────────── */
+    .main {
+      display: flex;
+      flex: 1;
+      gap: 0;
+      overflow: hidden;
+    }
+
+    /* ── Left: Chat Panel (Session 11.1) ─────────────────────── */
+    .chat-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid #1E293B;
+      min-width: 0;
+    }
+
+    .panel-header {
+      padding: 14px 20px;
+      border-bottom: 1px solid #1E293B;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #475569;
+    }
+
+    .chat-messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .message {
+      max-width: 85%;
+      font-size: 14px;
+      line-height: 1.6;
+      padding: 12px 16px;
+      border-radius: 10px;
+    }
+
+    .message.user {
+      align-self: flex-end;
+      background: #1E3A5F;
+      border: 1px solid #2563EB;
+      color: #E2E8F0;
+    }
+
+    .message.analyst {
+      align-self: flex-start;
+      background: #1E293B;
+      border: 1px solid #334155;
+      color: #E2E8F0;
+    }
+
+    .message.analyst .agent-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 6px;
+    }
+
+    .message.error { border-color: #EF4444; color: #FCA5A5; }
+
+    .message.thinking {
+      color: #475569;
+      font-style: italic;
+      font-size: 13px;
+    }
+
+    /* ── Chat Input (Session 11.1) ────────────────────────────── */
+    .chat-input-row {
+      display: flex;
+      gap: 10px;
+      padding: 16px 20px;
+      border-top: 1px solid #1E293B;
+    }
+
+    .chat-input {
+      flex: 1;
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 14px;
+      color: #F8FAFC;
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    .chat-input:focus { border-color: #3B82F6; }
+    .chat-input::placeholder { color: #475569; }
+
+    .send-btn {
+      background: #3B82F6;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+
+    .send-btn:hover  { background: #2563EB; }
+    .send-btn:disabled { background: #1E3A5F; cursor: not-allowed; color: #475569; }
+
+    /* ── Right: Dashboard Panel (Session 11.1) ────────────────── */
+    .dashboard-panel {
+      width: 380px;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      padding: 16px;
+      gap: 12px;
+    }
+
+    .dash-card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .dash-card-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    /* ── Live Event Timeline (Session 12.2) ──────────────────── */
+    #eventTimeline div {
+      transition: opacity 0.2s ease;
+    }
+
+    /* ── Agent Status Card (Session 11.1) ────────────────────── */
+    .agent-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+      border-bottom: 1px solid #0F172A;
+      font-size: 13px;
+    }
+
+    .agent-row:last-child { border-bottom: none; }
+    .agent-name { color: #F8FAFC; font-weight: 600; }
+    .agent-role { color: #475569; font-size: 11px; }
+
+    .agent-badge {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .badge-idle     { background: #1E293B; border: 1px solid #334155; color: #475569; }
+    .badge-running  { background: #1E3A5F; border: 1px solid #3B82F6; color: #93C5FD; }
+    .badge-done     { background: #064E3B; border: 1px solid #10B981; color: #6EE7B7; }
+    .badge-error    { background: #7F1D1D; border: 1px solid #EF4444; color: #FCA5A5; }
+    .badge-frontier { color: #D8B4FE; }
+    .badge-utility  { color: #94A3B8; }
+
+    /* ── Metrics Card (Session 11.1) ─────────────────────────── */
+    .metrics-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 5px 0;
+      border-bottom: 1px solid #0F172A;
+      font-size: 13px;
+    }
+
+    .metrics-row:last-child { border-bottom: none; }
+    .metric-label { color: #475569; }
+    .metric-value { color: #F8FAFC; font-weight: 700; font-family: 'Roboto Mono', monospace; font-size: 13px; }
+    .metric-value.good  { color: #10B981; }
+    .metric-value.warn  { color: #F59E0B; }
+    .metric-value.bad   { color: #EF4444; }
+
+    /* ── VRAM Card (Session 11.1) ─────────────────────────────── */
+    .vram-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      color: #94A3B8;
+    }
+
+    .vram-total {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 0 0;
+      border-top: 1px solid #334155;
+      margin-top: 4px;
+      color: #F8FAFC;
+    }
+
+    .precision-btns {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .precision-btn {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: 5px;
+      border: 1px solid #334155;
+      background: #0F172A;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .precision-btn.active  { border-color: #3B82F6; color: #93C5FD; background: #1E3A5F; }
+    .precision-btn:hover   { border-color: #475569; color: #94A3B8; }
+
+    /* ── Example Prompts (Session 11.1) ──────────────────────── */
+    .examples-row {
+      display: flex;
+      gap: 8px;
+      padding: 8px 20px;
+      border-top: 1px solid #1E293B;
+      flex-wrap: wrap;
+    }
+
+    .example-chip {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 12px;
+      border-radius: 20px;
+      border: 1px solid #334155;
+      background: #0F172A;
+      color: #64748B;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+    }
+
+    .example-chip:hover {
+      border-color: #3B82F6;
+      color: #93C5FD;
+      background: #1E3A5F;
+    }
+
+    .examples-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #334155;
+      align-self: center;
+      white-space: nowrap;
+    }
+
+    /* ── Placeholder cards for future sessions ────────────────── */
+    .dash-placeholder {
+      background: #111827;
+      border: 1px dashed #1E293B;
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .dash-placeholder .placeholder-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 4px;
+      color: #1E293B;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <header>
+    <div class="logo">Chronicle<span>.</span></div>
+    <div style="display:flex;gap:10px;align-items:center;">
+      <span class="session-pill">Session 12.3</span>
+      <span style="font-size:12px;color:#475569;">Real MCP Servers + Async Job Queue</span>
+    </div>
+  </header>
+
+  <!-- ── Session Progress ────────────────────────────────────── -->
+  <div class="session-progress">
+    <span class="progress-item">✅ S11.1 Inference</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item">✅ S11.2 Quantization</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item">✅ S11.3 GPU Allocation</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item">✅ S12.1 Gateway + MCP</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item">✅ S12.2 Streaming</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item active">🟢 S12.3 Queuing</span>
+    <span class="progress-sep">›</span>
+    <span class="progress-item">···</span>
+  </div>
+
+  <!-- ── Main Split Layout ───────────────────────────────────── -->
+  <div class="main">
+
+    <!-- ── Left: Chat Panel ──────────────────────────────────── -->
+    <div class="chat-panel">
+      <div class="panel-header">Analyst Chat</div>
+
+      <div class="chat-messages" id="chatMessages">
+        <div class="message analyst">
+          <div class="agent-label" style="color:#3B82F6;">Chronicle</div>
+          I'm Chronicle. Ask me the hard question. Your question now routes
+          through a compiled LangGraph swarm — ingestion pulls live data via
+          MCP (falling back to calibration samples when a connector is
+          offline), then pattern, timeline, brutality, and synthesis run in
+          sequence to produce your brief.
+        </div>
+      </div>
+
+      <div class="examples-row">
+        <span class="examples-label">Try:</span>
+        <button class="example-chip" onclick="fillExample('spotify')">🎵 Spotify · mood</button>
+        <button class="example-chip" onclick="fillExample('finance')">💳 Finance · habits</button>
+        <button class="example-chip" onclick="fillExample('github')">⌨️ GitHub · work</button>
+      </div>
+
+      <div class="chat-input-row">
+        <input
+          class="chat-input"
+          id="questionInput"
+          type="text"
+          placeholder="What does my data say about me that I haven't admitted yet?"
+          autocomplete="off"
+        />
+        <button class="send-btn" id="sendBtn" onclick="sendQuestion()">
+          Analyse →
+        </button>
+        <button class="send-btn" id="asyncBtn" onclick="sendQuestionAsync()"
+                style="background:#F59E0B;color:#0F172A;">
+          Queue (202) →
+        </button>
+      </div>
+      <div style="padding:4px 20px 0;font-size:11px;color:#475569;">
+        Queue (202) returns a job_id instantly and polls
+        <code style="color:#94A3B8;">/analyze/jobs/{job_id}</code> —
+        use this once mcp_servers/ are running and a full analysis takes 60-90s.
+      </div>
+    </div>
+
+    <!-- ── Right: Dashboard Panel ────────────────────────────── -->
+    <div class="dashboard-panel">
+
+      <!-- Agent Status Card (Session 11.1) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#3B82F6;">Agent Status</div>
+        <div id="agentRows">
+          <!-- populated by JS -->
+        </div>
+      </div>
+
+      <!-- Metrics Card (Session 11.1) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#8B5CF6;">Inference Metrics</div>
+        <div class="metrics-row">
+          <span class="metric-label">Wall clock</span>
+          <span class="metric-value" id="metricWall">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Mean TTFT</span>
+          <span class="metric-value" id="metricTTFT">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Min TTFT</span>
+          <span class="metric-value" id="metricMinTTFT">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Max TTFT</span>
+          <span class="metric-value" id="metricMaxTTFT">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Agents succeeded</span>
+          <span class="metric-value" id="metricSuccess">—</span>
+        </div>
+      </div>
+
+      <!-- VRAM Budget Card (Session 11.1) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#F59E0B;">VRAM Budget</div>
+        <div class="precision-btns">
+          <button class="precision-btn active" onclick="loadVRAM('fp16', this)">FP16</button>
+          <button class="precision-btn" onclick="loadVRAM('int8', this)">INT8</button>
+          <button class="precision-btn" onclick="loadVRAM('int4', this)">INT4</button>
+          <button class="precision-btn" onclick="loadVRAM('fp32', this)">FP32</button>
+        </div>
+        <div id="vramRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Tiered VRAM Card (Session 11.2) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#F59E0B;">Tiered VRAM Budget</div>
+        <div id="tieredVramRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Cost Model Card (Session 11.2) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#EC4899;">Monthly GPU Cost</div>
+        <div id="costModelRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Deployment Config Card (Session 11.3) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#EF4444;">vLLM Deployment Config</div>
+        <div id="deploymentConfigRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- OOM Safety Card (Session 11.3) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#10B981;">OOM Safety Check</div>
+        <div id="oomSafetyRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- MCP Connectors Card (Session 12.1) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#10B981;">MCP Data Connectors</div>
+        <div id="mcpRows">
+          <div style="font-size:12px;color:#475569;">Loading…</div>
+        </div>
+      </div>
+
+      <!-- Gateway Status Card (Session 12.1) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#3B82F6;">Gateway</div>
+        <div class="metrics-row">
+          <span class="metric-label">Session</span>
+          <span class="metric-value" id="gwSession">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Version</span>
+          <span class="metric-value" id="gwVersion">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Uptime</span>
+          <span class="metric-value" id="gwUptime">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">Graph</span>
+          <span class="metric-value good" id="gwGraph">—</span>
+        </div>
+      </div>
+
+      <!-- Live Event Timeline Card (Session 12.2) -->
+      <div class="dash-card">
+        <div class="dash-card-label" style="color:#8B5CF6;">Live Event Timeline</div>
+        <div id="eventTimeline" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;">
+          <div style="font-size:12px;color:#475569;">Events appear here during analysis…</div>
+        </div>
+      </div>
+
+      <!-- Async Job Queue Card (Session 12.3) -->
+      <div class="dash-card" id="jobStatusCard" style="display:none;">
+        <div class="dash-card-label" style="color:#F59E0B;">Async Job Queue</div>
+        <div class="metrics-row">
+          <span class="metric-label">job_id</span>
+          <span class="metric-value" id="jobId" style="font-size:10px;">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">status</span>
+          <span class="metric-value" id="jobStatus">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">active_node</span>
+          <span class="metric-value" id="jobNode">—</span>
+        </div>
+        <div class="metrics-row">
+          <span class="metric-label">polls</span>
+          <span class="metric-value" id="jobPolls">0</span>
+        </div>
+        <div id="jobResult" style="font-size:11px;color:#94A3B8;margin-top:8px;display:none;white-space:pre-wrap;"></div>
+      </div>
+
+      <!-- Placeholder: OTel Traces (Session 13.1) -->
+      <div class="dash-placeholder">
+        <div class="placeholder-label">Session 13.1</div>
+        OpenTelemetry Trace Viewer
+      </div>
+
+      <!-- Placeholder: Cost Ledger (Session 14.2) -->
+      <div class="dash-placeholder">
+        <div class="placeholder-label">Session 14.2</div>
+        Per-Agent Spend Ledger
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── JavaScript (Session 11.1) ───────────────────────────── -->
+  <script>
+    const API = 'http://localhost:8000';
+
+    const AGENTS = {
+      ingestion: { role: 'Parse & normalise data',         tier: 'utility',  precision: 'int4', max_model_len: 4096,  gpu_memory_utilization: 0.28 },
+      pattern:   { role: 'Find cross-source correlations', tier: 'utility',  precision: 'int4', max_model_len: 4096,  gpu_memory_utilization: 0.28 },
+      timeline:  { role: 'Sequence life events',           tier: 'utility',  precision: 'int4', max_model_len: 4096,  gpu_memory_utilization: 0.28 },
+      brutality: { role: 'Honest analysis, no softening',  tier: 'frontier', precision: 'fp16', max_model_len: 8192,  gpu_memory_utilization: 0.85 },
+      synthesis: { role: 'Final analyst brief',            tier: 'frontier', precision: 'fp16', max_model_len: 8192,  gpu_memory_utilization: 0.85 },
+    };
+
+    const AGENT_COLORS = {
+      ingestion: '#3B82F6',
+      pattern:   '#8B5CF6',
+      timeline:  '#F59E0B',
+      brutality: '#EF4444',
+      synthesis: '#10B981',
+    };
+
+    // ── Agent Rows ────────────────────────────────────────────
+    function renderAgentRows(statuses) {
+      statuses = statuses || {};
+      const el = document.getElementById('agentRows');
+      el.innerHTML = Object.entries(AGENTS).map(([name, info]) => {
+        const status = statuses[name] || 'idle';
+        const badgeClass = {
+          idle: 'badge-idle', running: 'badge-running',
+          done: 'badge-done', error: 'badge-error',
+        }[status] || 'badge-idle';
+        const tierClass = info.tier === 'frontier' ? 'badge-frontier' : 'badge-utility';
+        const precBadgeStyle = info.precision === 'fp16'
+          ? 'background:#2E1065;border:1px solid #7C3AED;color:#D8B4FE;'
+          : 'background:#052e16;border:1px solid #16a34a;color:#86efac;';
+        return `
+          <div class="agent-row">
+            <div>
+              <div class="agent-name" style="color:${AGENT_COLORS[name]}">${name}</div>
+              <div class="agent-role">${info.role}</div>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+              <span class="agent-badge ${badgeClass}">${status}</span>
+              <span class="agent-badge ${tierClass}" style="font-size:9px;">${info.tier}</span>
+              <span style="font-size:9px;padding:1px 6px;border-radius:4px;font-weight:700;${precBadgeStyle}">${(info.precision||'').toUpperCase()}</span>
+              <span style="font-size:9px;color:#64748B;margin-top:2px;">
+                mml: ${(info.max_model_len || 0).toLocaleString()}
+              </span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── VRAM Budget ───────────────────────────────────────────
+    async function loadVRAM(precision, btn) {
+      document.querySelectorAll('.precision-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const el = document.getElementById('vramRows');
+      el.innerHTML = '<div style="font-size:12px;color:#475569;">Loading…</div>';
+
+      try {
+        const res = await fetch(`${API}/vram-budget?precision=${precision}`);
+        const data = await res.json();
+        el.innerHTML = `
+          <div class="vram-row"><span>Model weights</span><span>${data.weight_gb} GB</span></div>
+          <div class="vram-row"><span>KV cache (5 agents)</span><span>${data.kv_cache_total_gb} GB</span></div>
+          <div class="vram-row"><span>CUDA overhead</span><span>${data.cuda_overhead_gb} GB</span></div>
+          <div class="vram-row"><span>Safety buffer</span><span>${data.safety_buffer_gb} GB</span></div>
+          <div class="vram-total">
+            <span>Total required</span>
+            <span style="color:#F59E0B;">${data.total_required_gb} GB</span>
+          </div>
+          <div style="font-size:11px;color:#475569;margin-top:8px;">
+            Recommended: <span style="color:#F8FAFC;font-weight:700;">${data.recommended_gpu}</span>
+          </div>`;
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline — start python api.py</div>`;
+      }
+    }
+
+    // ── Send Question (Session 12.2 — live SSE stream from the swarm) ──
+    async function sendQuestion() {
+      const input = document.getElementById('questionInput');
+      const question = input.value.trim();
+      if (!question) return;
+
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = true;
+      input.disabled  = true;
+      input.value     = '';
+
+      // Reset timeline and agent statuses for the new run
+      document.getElementById('eventTimeline').innerHTML = '';
+      renderAgentRows({});
+
+      addMessage('user', null, question);
+      const thinkingId = 'thinking-' + Date.now();
+      addMessage('thinking', null, 'Connecting to Chronicle stream…', null, false, thinkingId);
+
+      // ── Open SSE stream via fetch() ────────────────────────────────
+      // EventSource only supports GET; Chronicle needs POST (question body).
+      // fetch() with ReadableStream works for POST SSE.
+      let chatBuffer = '';   // accumulates token_chunks for the chat panel
+      let chatMsgId  = null;
+
+      try {
+        const response = await fetch(`${API}/analyze/stream`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            question,
+            data_sources: ['spotify', 'finance', 'fitness', 'github', 'journal'],
+            depth:        'standard',
+            debug:        true,
+          }),
+        });
+
+        if (!response.ok) {
+          removeMessage(thinkingId);
+          addMessage('analyst', 'chronicle', `Error ${response.status}: ${await response.text()}`, null, true);
+          return;
+        }
+
+        const reader  = response.body.getReader();
+        const decoder = new TextDecoder();
+        let   buffer  = '';
+
+        removeMessage(thinkingId);
+
+        // ── Read SSE frames from the stream ────────────────────────────
+        readLoop:
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+
+          // SSE frames are separated by a double newline
+          const frames = buffer.split('\n\n');
+          buffer       = frames.pop();   // keep incomplete frame in buffer
+
+          for (const frame of frames) {
+            if (!frame.trim() || frame.startsWith(':')) continue;  // keepalive comment
+
+            const lines    = frame.split('\n');
+            const dataLine = lines.find(l => l.startsWith('data:'));
+            if (!dataLine) continue;
+
+            let parsed;
+            try {
+              parsed = JSON.parse(dataLine.replace(/^data:\s*/, ''));
+            } catch { continue; }
+
+            handleStreamEvent(parsed, {
+              getOrCreateChatMsg: () => {
+                if (!chatMsgId) {
+                  chatMsgId = 'stream-chat-' + Date.now();
+                  addMessage('analyst', 'synthesis', '', null, false, chatMsgId);
+                }
+                return document.getElementById(chatMsgId);
+              },
+              appendToken: (chunk) => {
+                chatBuffer += chunk;
+                const el = document.getElementById(chatMsgId);
+                if (el) {
+                  const content = el.querySelector('.message-content');
+                  if (content) content.textContent = chatBuffer;
+                  const container = document.getElementById('chatMessages');
+                  container.scrollTop = container.scrollHeight;
+                }
+              },
+              attachFinalMeta: (text) => {
+                const el = document.getElementById(chatMsgId);
+                if (!el) return;
+                const foot = document.createElement('div');
+                foot.style.cssText = 'font-size:10px;color:#475569;margin-top:8px;font-family:monospace;';
+                foot.textContent = text;
+                el.appendChild(foot);
+              },
+            });
+
+            if (parsed.final === true) break readLoop;
+          }
+        }
+
+      } catch (e) {
+        removeMessage(thinkingId);
+        addMessage('analyst', 'chronicle', `Stream failed: ${e.message}`, null, true);
+      } finally {
+        sendBtn.disabled = false;
+        input.disabled   = false;
+        input.focus();
+      }
+    }
+
+    // ── Queue Analysis via 202 (Session 12.3) ───────────────────────
+    // POST /analyze/async returns instantly with a job_id; this polls
+    // GET /analyze/jobs/{job_id} until status is completed or failed.
+    async function sendQuestionAsync() {
+      const input    = document.getElementById('questionInput');
+      const question = input.value.trim();
+      if (!question) return;
+
+      const asyncBtn = document.getElementById('asyncBtn');
+      const sendBtn  = document.getElementById('sendBtn');
+      asyncBtn.disabled = true;
+      sendBtn.disabled  = true;
+      input.disabled    = true;
+      input.value       = '';
+
+      renderAgentRows({});
+      addMessage('user', null, question);
+
+      const jobCard = document.getElementById('jobStatusCard');
+      jobCard.style.display = 'block';
+      document.getElementById('jobId').textContent     = 'submitting…';
+      document.getElementById('jobStatus').textContent = 'queued';
+      document.getElementById('jobNode').textContent   = '—';
+      document.getElementById('jobPolls').textContent  = '0';
+      document.getElementById('jobResult').style.display = 'none';
+
+      try {
+        const submitStart = performance.now();
+        const res = await fetch(`${API}/analyze/async`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({
+            question,
+            data_sources: ['spotify', 'finance', 'fitness', 'github', 'journal'],
+            depth:        'standard',
+          }),
+        });
+        const submitMs = Math.round(performance.now() - submitStart);
+        const job      = await res.json();
+
+        if (res.status !== 202) {
+          addMessage('analyst', 'chronicle', `Submit failed: ${JSON.stringify(job)}`, null, true);
+          asyncBtn.disabled = false;
+          sendBtn.disabled  = false;
+          input.disabled    = false;
+          return;
+        }
+
+        addMessage('analyst', 'chronicle',
+          `✓ Queued in ${submitMs}ms — job_id: ${job.job_id.slice(0, 8)}… Polling ${job.poll_url} every ${job.retry_after_seconds}s…`);
+        document.getElementById('jobId').textContent = job.job_id.slice(0, 12) + '…';
+
+        let polls      = 0;
+        let intervalMs = (job.retry_after_seconds || 5) * 1000;
+        const pollMax  = 60;   // ~10+ minutes of polling headroom
+
+        const poll = async () => {
+          if (polls >= pollMax) {
+            addMessage('analyst', 'chronicle', `Polling timeout. Check ${job.poll_url} manually.`, null, true);
+            asyncBtn.disabled = false;
+            sendBtn.disabled  = false;
+            input.disabled    = false;
+            return;
+          }
+          polls++;
+          document.getElementById('jobPolls').textContent = polls;
+
+          try {
+            const statusRes  = await fetch(`${API}${job.poll_url}`);
+            const statusData = await statusRes.json();
+            const status     = statusData.status;
+
+            document.getElementById('jobStatus').textContent = status;
+            document.getElementById('jobStatus').className   = 'metric-value ' + (
+              status === 'completed' ? 'good' : status === 'failed' ? 'bad' : ''
+            );
+            document.getElementById('jobNode').textContent = statusData.active_node || '—';
+
+            if (statusData.active_node) {
+              renderAgentRows({ [statusData.active_node]: 'running' });
+            }
+
+            if (status === 'completed') {
+              const resultEl = document.getElementById('jobResult');
+              resultEl.style.display = 'block';
+              resultEl.textContent   = statusData.final_result || 'No brief generated.';
+
+              addMessage('analyst', 'synthesis', statusData.final_result || 'No brief generated.',
+                `confidence: ${statusData.confidence} · ${statusData.processing_ms}ms · ${(statusData.sources_used || []).join(' · ')}`);
+
+              setMetric('metricWall', (statusData.processing_ms || 0) + 'ms', 'good');
+              setMetric('metricSuccess', '5 / 5', 'good');
+              renderAgentRows(Object.fromEntries(Object.keys(AGENTS).map(k => [k, 'done'])));
+
+              asyncBtn.disabled = false;
+              sendBtn.disabled  = false;
+              input.disabled    = false;
+              return;
+            }
+
+            if (status === 'failed') {
+              addMessage('analyst', 'chronicle', `Analysis failed: ${statusData.error_message}`, null, true);
+              asyncBtn.disabled = false;
+              sendBtn.disabled  = false;
+              input.disabled    = false;
+              return;
+            }
+
+            intervalMs = Math.min(intervalMs * 1.2, 15000);
+            setTimeout(poll, intervalMs);
+          } catch (e) {
+            setTimeout(poll, intervalMs);
+          }
+        };
+
+        setTimeout(poll, intervalMs);
+
+      } catch (e) {
+        addMessage('analyst', 'chronicle', `Submit error: ${e.message}`, null, true);
+        asyncBtn.disabled = false;
+        sendBtn.disabled  = false;
+        input.disabled    = false;
+      }
+    }
+
+    // ── Handle each parsed SSE event (Session 12.2) ────────────────
+    function handleStreamEvent(event, { getOrCreateChatMsg, appendToken, attachFinalMeta }) {
+      const timeline = document.getElementById('eventTimeline');
+
+      switch (event.event_type) {
+
+        case 'stream_start':
+          addTimelineEvent(timeline, '🔵', 'stream_start', 'Chronicle connected');
+          break;
+
+        case 'agent_handoff': {
+          const label = event.to_agent || '';
+          addTimelineEvent(timeline, '⚡', 'agent_handoff', label + ' active');
+          const nodeKey = Object.keys(AGENTS).find(k =>
+            label.toLowerCase().startsWith(k)
+          );
+          if (nodeKey) {
+            renderAgentRows({ [nodeKey]: 'running' });
+          }
+          break;
+        }
+
+        case 'tool_call':
+          addTimelineEvent(timeline, '📡', 'tool_call', `${event.agent}: ${event.tool_name}`);
+          break;
+
+        case 'tool_result': {
+          const icon = event.status === 'success' ? '✓' : event.status === 'fallback' ? '↩' : '✗';
+          addTimelineEvent(timeline, icon, 'tool_result', event.message);
+          break;
+        }
+
+        case 'token_chunk':
+          getOrCreateChatMsg();
+          appendToken(event.chunk);
+          break;
+
+        case 'final_answer': {
+          addTimelineEvent(timeline, '✅', 'final_answer', `Done · ${event.processing_ms}ms`);
+          setMetric('metricWall', event.processing_ms + 'ms', 'good');
+          setMetric('metricSuccess', '5 / 5', 'good');
+          renderAgentRows(
+            Object.fromEntries(Object.keys(AGENTS).map(k => [k, 'done']))
+          );
+          const sourceNote = (event.sources_used || []).join(' · ');
+          attachFinalMeta(`confidence: ${event.confidence} · ${event.processing_ms}ms · ${sourceNote}`);
+          break;
+        }
+
+        case 'error':
+          addTimelineEvent(timeline, '✗', 'error', event.message);
+          addMessage('analyst', 'chronicle', `Error: ${event.message}`, null, true);
+          break;
+      }
+    }
+
+    // ── Add an event row to the live timeline (Session 12.2) ────────
+    function addTimelineEvent(container, icon, type, message) {
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px solid #1E293B;';
+      row.innerHTML = `
+        <span style="min-width:16px;text-align:center;">${icon}</span>
+        <span style="color:#475569;text-transform:uppercase;font-size:10px;min-width:80px;">${type}</span>
+        <span style="color:#94A3B8;">${message}</span>`;
+      container.appendChild(row);
+      container.scrollTop = container.scrollHeight;
+    }
+
+    // ── Helpers ───────────────────────────────────────────────
+    function addMessage(type, agent, text, meta, isError, id) {
+      const container = document.getElementById('chatMessages');
+      const div = document.createElement('div');
+      if (id) div.id = id;
+      div.className = `message ${type === 'user' ? 'user' : type === 'thinking' ? 'thinking analyst' : 'analyst'}`;
+      if (isError) div.classList.add('error');
+      if (agent && type !== 'thinking') {
+        const label = document.createElement('div');
+        label.className = 'agent-label';
+        label.style.color = AGENT_COLORS[agent] || '#3B82F6';
+        label.textContent = agent.toUpperCase();
+        div.appendChild(label);
+      }
+      const content = document.createElement('div');
+      content.className = 'message-content';
+      content.textContent = text;
+      div.appendChild(content);
+      if (meta) {
+        const foot = document.createElement('div');
+        foot.className = 'message-meta';
+        foot.style.cssText = 'font-size:10px;color:#475569;margin-top:8px;font-family:monospace;';
+        foot.textContent = meta;
+        div.appendChild(foot);
+      }
+      container.appendChild(div);
+      container.scrollTop = container.scrollHeight;
+      return div;
+    }
+
+    function removeMessage(id) {
+      const el = document.getElementById(id);
+      if (el) el.remove();
+    }
+
+    function setMetric(id, value, cls) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = value;
+      el.className = 'metric-value ' + (cls || '');
+    }
+
+    // ── Enter key to send ─────────────────────────────────────
+    document.getElementById('questionInput').addEventListener('keydown', e => {
+      if (e.key === 'Enter') sendQuestion();
+    });
+
+    // ── Example Prompts ───────────────────────────────────────
+    const EXAMPLES = {
+      spotify: `My Spotify data, last 30 days: top artists — Radiohead (42 plays), Kendrick Lamar (38), Mac DeMarco (31). Listening peaks 11pm–2am on weekdays. Skip rate highest Monday mornings. Saturday afternoons I switch to Bonobo and Nils Frahm. 0 plays on Sunday evenings. What does this say about me?`,
+      finance: `My last 60 days of transactions: Uber Eats £340, gym membership cancelled in March, coffee shops £180 (avg 2x daily), 3 Amazon orders placed past midnight, savings rate dropped from 18% to 4% over 6 months. Rent £1,400/mo, salary £3,200/mo. Two subscriptions I haven't opened in 4 months. What pattern do you see?`,
+      github: `My GitHub activity last 90 days: 847 commits total, 73% pushed between 9pm–1am, 0 commits on weekends, 14 force-pushes to main, 6 PRs open >30 days with no review requested, average commit message length 4 words, 3 repos started and abandoned after day 2. What does this say about how I work?`,
+    };
+
+    function fillExample(key) {
+      const input = document.getElementById('questionInput');
+      input.value = EXAMPLES[key];
+      input.focus();
+    }
+
+    // ── Tiered VRAM Card (Session 11.2) ──────────────────────
+    async function loadTieredVRAM() {
+      const el = document.getElementById('tieredVramRows');
+      try {
+        const res  = await fetch(`${API}/vram-budget/tiered`);
+        const data = await res.json();
+        const agentRows = Object.entries(data.per_agent || {}).map(([name, a]) => `
+          <div class="vram-row">
+            <span style="color:${AGENT_COLORS[name]};font-weight:600;">${name}</span>
+            <span>${a.precision?.toUpperCase()} ${a.model_size_b}B → ${a.weight_gb}GB + ${a.kv_cache_gb}GB KV = ${a.agent_total_gb}GB</span>
+          </div>`).join('');
+        el.innerHTML = agentRows + `
+          <div class="vram-total">
+            <span>S11.3 Calibrated</span>
+            <span style="color:#F59E0B;">${data.s11_3_calibrated_gb} GB</span>
+          </div>
+          <div style="font-size:11px;color:#475569;margin-top:6px;">
+            Saved vs S11.1: <span style="color:#10B981;">${data.vram_saved_vs_s11_1_gb} GB</span>
+            · Recommended: <span style="color:#F8FAFC;font-weight:700;">${data.recommended_gpu}</span>
+          </div>`;
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline</div>`;
+      }
+    }
+
+    // ── Cost Model Card (Session 11.2) ────────────────────────
+    async function loadCostModel() {
+      const el = document.getElementById('costModelRows');
+      try {
+        const res  = await fetch(`${API}/cost-model`);
+        const data = await res.json();
+        const rec  = data.recommended_scenario;
+        const rows = Object.entries(data.scenarios || {}).map(([key, sc]) => {
+          const isRec = key === rec;
+          return `
+            <div class="metrics-row" style="${isRec ? 'background:#0F2D1F;border-radius:4px;padding:4px 6px;margin:-2px -6px;' : ''}">
+              <span class="metric-label" style="font-size:10px;${isRec ? 'color:#10B981;' : ''}">${sc.label}</span>
+              <span class="metric-value" style="font-size:11px;${isRec ? 'color:#10B981;' : ''}">$${sc.monthly_usd.toLocaleString()}/mo</span>
+            </div>`;
+        }).join('');
+        el.innerHTML = rows;
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline</div>`;
+      }
+    }
+
+    // ── Deployment Config Card (Session 11.3) ─────────────────
+    async function loadDeploymentConfig() {
+      const el = document.getElementById('deploymentConfigRows');
+      try {
+        const res  = await fetch(`${API}/deployment-config`);
+        const data = await res.json();
+        const rows = Object.entries(data.agents).map(([name, cfg]) => `
+          <div class="metrics-row">
+            <span class="metric-label" style="color:${AGENT_COLORS[name]};font-weight:700;">${name}</span>
+            <span style="font-size:10px;color:#94A3B8;">
+              mml: <span style="color:#F8FAFC;">${cfg.max_model_len.toLocaleString()}</span>
+              · util: <span style="color:#F8FAFC;">${cfg.gpu_memory_utilization}</span>
+              · conc: <span style="color:#F8FAFC;">${cfg.max_num_seqs}</span>
+            </span>
+          </div>`).join('');
+        el.innerHTML = rows + `
+          <div style="font-size:10px;color:#475569;margin-top:8px;border-top:1px solid #1E293B;padding-top:6px;">
+            co-located: ingestion + pattern + timeline → 1× L4<br>
+            dedicated: brutality → A100-40 · synthesis → A100-40
+          </div>`;
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline</div>`;
+      }
+    }
+
+    // ── OOM Safety Card (Session 11.3) ────────────────────────
+    async function loadOomSafety() {
+      const el = document.getElementById('oomSafetyRows');
+      try {
+        const res  = await fetch(`${API}/oom-check`);
+        const data = await res.json();
+        const allSafe = data.all_safe;
+        const rows = Object.entries(data.oom_prevention.per_agent).map(([name, r]) => `
+          <div class="metrics-row">
+            <span class="metric-label" style="color:${AGENT_COLORS[name]};">${name}</span>
+            <span style="font-size:11px;">
+              <span style="color:${r.safe ? '#10B981' : '#EF4444'};font-weight:700;">
+                ${r.safe ? '✓' : '✗'}
+              </span>
+              <span style="color:#94A3B8;"> ${r.max_safe_concurrent} slots · ${r.kv_per_request_gb}GB/req</span>
+            </span>
+          </div>`).join('');
+        el.innerHTML = `
+          <div style="font-size:11px;font-weight:700;margin-bottom:8px;color:${allSafe ? '#10B981' : '#EF4444'};">
+            ${allSafe ? '✓ ALL AGENTS SAFE' : '✗ UNSAFE — FIX BEFORE DEPLOY'}
+          </div>
+          ${rows}`;
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline</div>`;
+      }
+    }
+
+    // ── MCP Connectors + Gateway Card (Session 12.1) ──────────
+    async function loadMCPStatus() {
+      const el = document.getElementById('mcpRows');
+      try {
+        const res  = await fetch(`${API}/health`);
+        const data = await res.json();
+
+        // Update gateway card
+        document.getElementById('gwSession').textContent = data.session || '—';
+        document.getElementById('gwVersion').textContent = data.version || '—';
+        document.getElementById('gwUptime').textContent  = (data.uptime_s != null ? data.uptime_s : '—') + 's';
+        document.getElementById('gwGraph').textContent   = 'compiled ✓';
+
+        const sources = data.mcp_sources || {};
+        const ICONS   = {
+          spotify: '🎵', finance: '💳', fitness: '🏃',
+          github: '⚡', journal: '📓',
+        };
+        el.innerHTML = Object.entries(sources).map(([name, info]) => `
+          <div class="agent-row">
+            <div>
+              <div class="agent-name">${ICONS[name] || '📡'} ${name}</div>
+            </div>
+            <span class="agent-badge ${info.connected ? 'badge-done' : 'badge-idle'}">
+              ${info.connected ? 'live' : 'fallback'}
+            </span>
+          </div>`).join('') || '<div style="font-size:12px;color:#475569;">No sources configured</div>';
+
+      } catch (e) {
+        el.innerHTML = `<div style="font-size:12px;color:#EF4444;">API offline — start python api.py</div>`;
+      }
+    }
+
+    // ── Init ──────────────────────────────────────────────────
+    renderAgentRows();
+    loadVRAM('fp16', document.querySelector('.precision-btn.active'));
+    loadTieredVRAM();         // S11.2
+    loadCostModel();          // S11.2
+    loadDeploymentConfig();   // S11.3
+    loadOomSafety();          // S11.3
+    loadMCPStatus();          // S12.1
+  </script>
+</body>
+</html>
