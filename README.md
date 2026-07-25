@@ -12,6 +12,22 @@ This README covers two independent things:
 2. **What Session 13.3 specifically added, verified, and fixed**, so the
    build is reproducible.
 
+### Repo layout
+
+```
+phase4-session9/
+├── README.md          ← you are here
+├── .gitignore          ← repo-root ignores (.claude/, .idea/, .venv/, ...)
+└── chronicle/           ← the actual project — everything runs from inside here
+    ├── monitoring_daemon.py   ← Session 13.3's deliverable
+    ├── agent.py, api.py, otel_setup.py, judge_pipeline.py, ...
+    ├── docker-compose.yml, Dockerfile
+    ├── requirements.txt
+    └── .env.example
+```
+
+Every command below is run from inside `chronicle/`, not the repo root.
+
 ---
 
 ## 0. Prerequisites
@@ -32,7 +48,8 @@ stack (Phoenix + API + UI) used to *generate* live traces.
 ## 1. Clone and set up (do this exactly once)
 
 ```bash
-cd chronicle
+git clone https://github.com/waseemkhan606/phase4-session9.git
+cd phase4-session9/chronicle
 
 # 1. Create an isolated virtual environment — do NOT reuse a global
 #    Python. This avoids version drift and keeps `pip install` idempotent.
