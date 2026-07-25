@@ -244,17 +244,132 @@ from Session 13.2. It is a pure *consumer* of Sessions 13.1/13.2's
 output (OTel span attributes + the Judge pipeline); no new
 instrumentation was introduced.
 
-Nine logical sections, mirroring the session doc's Colab cells:
+### Step-by-step implementation
 
-1. `SLO` model + `SWARM_SLOS` register (4 SLOs: latency, token budget, trajectory quality, tool-registry integrity)
-2. `TokenBurnRateCalculator` — rolling-window burn-rate SLI, AND-predicate (rate *and* per-ticket mean must both breach)
-3. `ToolHallucinationTripwire` — hard-fail, no window, no threshold
-4. `PhoenixClient` / `PhoenixTraceRecord` — simulated Phoenix GraphQL client with a 5s query lag and `seed_fixture()` for offline demo
-5. `call_judge()` + `ThreeStrikesJudge` — live Gemini judge calls, catastrophic short-circuit below 5.0, 3-strikes state machine otherwise
-6. `Incident` model + `route_incident()` — routes by `point_of_failure`, raises `KeyError` on an unknown one (fail loud, no silent default)
-7. `CooldownRegistry` — suppresses repeat pages for the same signature within a window
-8. `MonitoringDaemon` — ties it together: `tick()` runs all 5 checks in order, with two-window hysteresis on latency and a `min_sample_size` guard
-9. Trace fixtures (`build_healthy_traces` / `build_degraded_traces`) + `run_degradation_demo()` — end-to-end offline demo
+The file is built as 10 sections, in dependency order — each one only
+depends on what came before it. This is the order to read (or rebuild)
+it in. Line numbers are anchors into `chronicle/monitoring_daemon.py`.
+
+**Step 1 — Declare SLOs as first-class objects** (`monitoring_daemon.py:58-119`)
+Before writing a single tripwire, every alert this daemon can ever fire
+is declared as an `SLO` up front. The rule: if you can't point at the
+`SLO` behind an alert, don't ship the alert.
+```python
+class SLO(BaseModel):
+    name:             str
+    sli_description:  str
+    target:           str
+    window_seconds:   int
+    span_attributes:  List[str]   # span attrs from Session 13.1 this SLO reads
+    breach_action:    str
+
+SWARM_SLOS = [
+    SLO(name="latency_p95", target="p95 <= 12.0 seconds", window_seconds=60, ...),
+    SLO(name="token_budget", target="mean <= 1500, p99 <= 3500", window_seconds=300, ...),
+    SLO(name="trajectory_quality", target="mean >= 8.0; 3 consecutive < 8.0 => CRITICAL", ...),
+    SLO(name="tool_registry_integrity", target="exactly zero, ever", window_seconds=0, ...),
+]
+```
+Four SLOs, one per tripwire built in the steps below.
+
+**Step 2 — `TokenBurnRateCalculator`: the burn-rate SLI** (`:124-181`)
+A rolling `deque` of `(timestamp, token_count)`. `ingest()` appends and
+evicts anything older than `window_seconds`. The key design decision is
+`is_tripped()`'s **AND**, not OR:
+```python
+def is_tripped(self) -> bool:
+    return (
+        self.current_rate()     > self.threshold
+        and self.mean_per_ticket() > self.per_ticket_threshold
+    )
+```
+Rate alone spikes on one legitimately large ticket; mean-per-ticket
+alone spikes on a short burst of small tickets. Only a real ReAct spiral
+trips both at once.
+
+**Step 3 — `ToolHallucinationTripwire`: hard-fail, no window** (`:186-217`)
+Every other check in this daemon is a rolling statistic. This one isn't
+— it's a single lookup against `TOOL_REGISTRY`. If an agent calls a tool
+name that was never bound to it, that's a prompt/tool-binding regression,
+not noise to smooth over:
+```python
+def check(self, agent_name: str, tool_name: str) -> Optional[dict]:
+    known = self.registry.get(agent_name, set())
+    if tool_name in known:
+        return None
+    return {"violation": "tool_hallucination", "severity": "CRITICAL", ...}
+```
+
+**Step 4 — `PhoenixClient` / `PhoenixTraceRecord`: the data source** (`:220-292`)
+Defines the shape of one trace record and a client with a **5-second
+query lag** — it queries `[now - window - 5s, now - 5s]`, never the
+trailing 5 seconds, because Phoenix is still indexing the newest spans
+when the daemon polls. A 0-lag query would read partial data and produce
+false negatives. `seed_fixture()` swaps in synthetic traces so the rest
+of the daemon can be built and demoed without a live Phoenix instance —
+`query_recent_traces()` is the only method a real GraphQL implementation
+would need to replace.
+
+**Step 5 — `call_judge()` + `ThreeStrikesJudge`: trajectory quality** (`:305-372`)
+`call_judge()` makes one `temperature=0` Gemini call per sampled trace
+and parses a `{"score": ..., "reason": ...}` JSON response, falling back
+to a neutral `7.0` (not a crash) on any schema violation.
+`ThreeStrikesJudge` is the state machine on top: three consecutive
+scores below 8.0 trips the alarm, any passing score resets the counter,
+and — the one exception to "three strikes" — a single score below 5.0
+trips it immediately:
+```python
+def observe(self, score: float) -> bool:
+    if score < self.CATASTROPHIC_THRESHOLD:
+        self.strike_count = self.strikes_needed   # instant trip
+    elif score < self.threshold:
+        self.strike_count += 1
+    else:
+        self.strike_count = 0                      # reset on pass
+    return self.strike_count >= self.strikes_needed
+```
+
+**Step 6 — `Incident` + `route_incident()`: routing** (`:376-421`)
+`Incident` requires `trace_id` and `langgraph_thread_id` — pydantic
+rejects construction without them, because an alert with no trace to
+pull up in Phoenix is a rumour, not an incident. `route_incident()` maps
+`point_of_failure` (`infra` / `queue` → Infra On-Call; `prompt` / `graph`
+→ AI Architect) to an owner, and **raises `KeyError`** on an unrecognized
+`point_of_failure` rather than defaulting silently — a dead routing rule
+should be loud, not quietly drop a page.
+
+**Step 7 — `CooldownRegistry`: alert suppression** (`:426-451`)
+One method, keyed by signature: `should_page()` returns `True` only if
+more than `cooldown_seconds` have passed since that *same signature*
+last paged. A different signature firing mid-cooldown still pages —
+this is what stops one degradation from producing 40 pages an hour
+without ever masking a second, unrelated failure.
+
+**Step 8 — `MonitoringDaemon`: wiring it together** (`:455-626`)
+`tick()` runs, in order: ingest tokens → tool-hallucination check (no
+window) → latency p95 with **two-window hysteresis** (needs two
+consecutive breaching windows before paging, so one cold-start outlier
+can't wake anyone at 3am) → token burn rate → sampled judge scores. A
+`min_sample_size` guard skips the latency check entirely on tiny
+windows, where p95 is meaningless. `_page()` is the single choke point
+every alert passes through: cooldown check → build `Incident` → route →
+print, with `trace_id` in the printed line every time.
+
+**Step 9 — Trace fixtures + `run_degradation_demo()`: proving it works offline** (`:630-780`)
+`build_healthy_traces()` and `build_degraded_traces()` synthesize
+before/after trace batches — the degraded batch simulates idempotency
+keys being removed from the swarm config (latency 11-18s vs 1.5-2.8s,
+tokens 3.8-5.2k vs 600-1k, judge scores 4.5-7.2 vs 8.2-9.8, plus one
+hallucinated tool name). `run_degradation_demo()` seeds healthy traces,
+ticks (no alerts), seeds degraded traces, ticks twice (hysteresis needs
+two windows), and prints the alert ledger.
+
+**Step 10 — `run_session_verification()`: the unit checks** (`:784-` end)
+Six checks run before the demo ever executes — burn rate trips/doesn't
+trip correctly, the tripwire passes/fails correctly, three-strikes and
+the catastrophic short-circuit both fire correctly. If any of these
+fail, the script exits before running the demo (`sys.exit(1)`) rather
+than showing a degradation demo built on broken primitives.
 
 ### Fixes applied on top of the original spec
 
